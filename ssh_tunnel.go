@@ -1,11 +1,12 @@
 package sshtunnel
 
 import (
-	"golang.org/x/crypto/ssh"
 	"io"
 	"log"
 	"net"
 	"sync"
+
+	"golang.org/x/crypto/ssh"
 )
 
 type SSHTunnel struct {
@@ -29,6 +30,7 @@ func (tunnel *SSHTunnel) Start() error {
 		return err
 	}
 	tunnel.Local.Port = listener.Addr().(*net.TCPAddr).Port
+CONNLOOP:
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -39,7 +41,11 @@ func (tunnel *SSHTunnel) Start() error {
 		go tunnel.forward(conn, &wg)
 		wg.Wait()
 		tunnel.logf("tunnel closed")
-		break
+		select {
+		case <-tunnel.close:
+			break CONNLOOP
+		default:
+		}
 	}
 	err = listener.Close()
 	if err != nil {
